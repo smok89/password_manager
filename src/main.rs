@@ -1,10 +1,17 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use rand::Rng;
 use rand::seq::SliceRandom;
+use inquire::CustomType;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Parser, Debug)]
+struct RequirementsArgs {
     length: u32, //lenght of the password
     #[arg(short = 'c', long = "capitals")]
     capitals: Option<u32>,
@@ -12,6 +19,11 @@ struct Args {
     digits: Option<u32>,
     #[arg(short = 's', long = "symbols")]
     symbols: Option<u32>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Generate(RequirementsArgs),
 }
 
 #[derive(Debug)]
@@ -22,18 +34,15 @@ struct PasswordRequirements {
     symbols: u32,
 }
 
-fn get_password_requirements(args: Args) -> Option<PasswordRequirements> {
-    let capitals: u32 = args.capitals.unwrap_or(0);
-    let digits: u32 = args.digits.unwrap_or(0);
-    let symbols: u32 = args.symbols.unwrap_or(0);
+fn get_password_requirements(length: u32, capitals: u32, digits: u32, symbols: u32) -> Option<PasswordRequirements> {
     let sum: u32 = capitals + digits + symbols;
 
-    if sum > args.length {
+    if sum > length {
         None
     } else {
         Some(
             PasswordRequirements {
-                lowercase: args.length - sum,
+                lowercase: length - sum,
                 capitals,
                 digits,
                 symbols
@@ -45,12 +54,11 @@ fn get_password_requirements(args: Args) -> Option<PasswordRequirements> {
 fn generate_string_from_charset(charset: &&[u8], length: u32) -> String {
     let mut rng = rand::thread_rng();
     let charset_len = (*charset).len();
-    let random_string: String = (0..length).map(|_| {
+    (0..length).map(|_| {
         let index = rng.gen_range(0..charset_len);
         (*charset)[index] as char
     })
-    .collect();
-    random_string
+    .collect()
 }
 
 fn generate_password_from_requirements(requirements: PasswordRequirements) -> String {
@@ -84,17 +92,57 @@ fn generate_password_from_requirements(requirements: PasswordRequirements) -> St
 
 
     let mut chars: Vec<char> = concatenated_random_string.chars().collect(); // Convert String into a vector to shuffle
-
     chars.shuffle(&mut rng);
-    
     chars.into_iter().collect() // convert back into a String
 }
 
-fn main() {
-    let args = Args::parse();
+fn prompt_user_for_password_requirements() -> PasswordRequirements {
+    let length: u32 = CustomType::new("Enter password length")
+        .with_default(12)
+        .prompt()
+        .expect("Failed to get input");
 
-    match get_password_requirements(args) {
-        Some(requirements) => println!("{}", generate_password_from_requirements(requirements)),
-        _ => println!("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
+    // Compute default value for uppercase letters, symbols and digits
+    let default_partition = (length as f64 / 4.0).floor() as u32;
+
+    let capitals: u32 = CustomType::new("Enter the number of capital letters")
+        .with_default(default_partition)
+        .prompt()
+        .expect("Failed to get input");
+
+    let digits: u32 = CustomType::new("Enter the number of digits")
+        .with_default(default_partition)
+        .prompt()
+        .expect("Failed to get input");
+
+    let symbols: u32 = CustomType::new("Enter the number of symbols")
+        .with_default(default_partition)
+        .prompt()
+        .expect("Failed to get input");
+
+    get_password_requirements(length, capitals, digits, symbols)
+        .expect("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Some(Commands::Generate(args)) => {
+            // using the values provided directly when invoking the program
+            let caps = args.capitals.unwrap_or(0);
+            let digs = args.digits.unwrap_or(0);
+            let syms = args.symbols.unwrap_or(0);
+
+            match get_password_requirements(args.length, caps, digs, syms) {
+                Some(requirements) => println!("{}", generate_password_from_requirements(requirements)),
+                None => println!("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
+            }
+        },
+        None => {
+            // calling the inquire interface to get the values interactively
+            let requirements = prompt_user_for_password_requirements();
+            print!("{}", generate_password_from_requirements(requirements));
+        }
     }
 }
