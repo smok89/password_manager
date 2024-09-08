@@ -25,6 +25,7 @@ struct RequirementsArgs {
 #[derive(Subcommand, Debug)]
 enum Commands {
     Generate(RequirementsArgs),
+    Auto,
 }
 
 #[derive(Debug)]
@@ -143,6 +144,15 @@ fn compute_and_print_password(requirements: PasswordRequirements) {
                     }
 }
 
+fn get_auto_requirements() -> PasswordRequirements {
+    PasswordRequirements { 
+        lowercase: 8,
+        capitals: 8,
+        digits: 8,
+        symbols: 8,
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -158,6 +168,10 @@ fn main() {
                 None => println!("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
             }
         },
+        Some(Commands::Auto) => {
+            let requirements = get_auto_requirements();
+            compute_and_print_password(requirements);
+        }
         None => {
             // calling the inquire interface to get the values interactively
             compute_and_print_password(prompt_user_for_password_requirements());     
