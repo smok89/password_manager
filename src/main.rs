@@ -95,6 +95,6 @@ fn main() {
 
     match get_password_requirements(args) {
         Some(requirements) => println!("{}", generate_password_from_requirements(requirements)),
-        _ => println!("Incorrect requirements.")
+        _ => println!("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
     }
 }
