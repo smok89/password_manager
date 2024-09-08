@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 use rand::Rng;
 use rand::seq::SliceRandom;
-use inquire::CustomType;
+use inquire::{CustomType, Confirm};
+use clipboard::{ClipboardContext, ClipboardProvider};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -124,6 +125,24 @@ fn prompt_user_for_password_requirements() -> PasswordRequirements {
         .expect("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
 }
 
+fn copy_to_clipboard(password: String) {
+    let mut ctx: ClipboardContext = ClipboardProvider::new().expect("Failed to access clipboard.");
+    ctx.set_contents(password).expect("Failed to copy to clipboard.");
+}
+
+fn compute_and_print_password(requirements: PasswordRequirements) {
+    let password = generate_password_from_requirements(requirements);
+                    println!("Successully generated a password: {}", password);
+                    if Confirm::new("Do you wish to copy this password to the clipboard?")
+                        .with_default(true)
+                        .prompt()
+                        .unwrap()
+                    {
+                        copy_to_clipboard(password);
+                        println!("Password copied to clipboard.")
+                    }
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -135,14 +154,13 @@ fn main() {
             let syms = args.symbols.unwrap_or(0);
 
             match get_password_requirements(args.length, caps, digs, syms) {
-                Some(requirements) => println!("{}", generate_password_from_requirements(requirements)),
+                Some(requirements) => {compute_and_print_password(requirements) },
                 None => println!("Incorrect requirements: the sum of capitals, digits, and symbols exceeds the total length.")
             }
         },
         None => {
             // calling the inquire interface to get the values interactively
-            let requirements = prompt_user_for_password_requirements();
-            print!("{}", generate_password_from_requirements(requirements));
+            compute_and_print_password(prompt_user_for_password_requirements());     
         }
     }
 }
